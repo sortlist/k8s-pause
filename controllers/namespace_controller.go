@@ -146,7 +146,8 @@ func (r *NamespaceReconciler) resume(ctx context.Context, ns corev1.Namespace, p
 	}
 
 	for _, pod := range list.Items {
-		if ignore, ok := pod.Annotations[ignoreAnnotation]; ok && ignore == "true" {
+		if shouldIgnorePod(pod) {
+			logger.Info("Ignoring pod due to annotation", "pod", pod.Name)
 			continue
 		}
 
@@ -231,7 +232,8 @@ func (r *NamespaceReconciler) suspend(ctx context.Context, ns corev1.Namespace, 
 	}
 
 	for _, pod := range list.Items {
-		if ignore, ok := pod.Annotations[ignoreAnnotation]; ok && ignore == "true" {
+		if shouldIgnorePod(pod) {
+			logger.Info("Ignoring pod due to annotation", "pod", pod.Name)
 			continue
 		}
 
@@ -244,6 +246,13 @@ func (r *NamespaceReconciler) suspend(ctx context.Context, ns corev1.Namespace, 
 	return ctrl.Result{}, nil
 }
 
+func shouldIgnorePod(pod corev1.Pod) bool {
+	if ignore, ok := pod.Annotations[ignoreAnnotation]; ok && ignore == "true" {
+		return true
+	}
+	return false
+}
+
 func (r *NamespaceReconciler) suspendNotInProfile(ctx context.Context, ns corev1.Namespace, profile v1beta1.ResumeProfile, logger logr.Logger) (ctrl.Result, error) {
 	var list corev1.PodList
 	if err := r.Client.List(ctx, &list, client.InNamespace(ns.Name)); err != nil {
@@ -251,6 +260,11 @@ func (r *NamespaceReconciler) suspendNotInProfile(ctx context.Context, ns corev1
 	}
 
 	for _, pod := range list.Items {
+		if shouldIgnorePod(pod) {
+			logger.Info("Ignoring pod due to annotation", "pod", pod.Name)
+			continue
+		}
+
 		if matchesResumeProfile(pod, profile) {
 			continue
 		}
